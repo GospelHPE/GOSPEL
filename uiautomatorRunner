@@ -1,0 +1,515 @@
+package com..xdevice.rebottest.runner;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import android.annotation.SuppressLint;
+import android.os.HandlerThread;
+import android.view.MotionEvent;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
+
+import com.android.uiautomator.core.EventListener;
+import com.android.uiautomator.core.ShellUiAutomatorBridge;
+import com.android.uiautomator.core.UiAutomationShellWrapper;
+import com.android.uiautomator.core.UiDevice;
+import com.android.uiautomator.core.UiObject;
+import com.android.uiautomator.core.UiSelector;
+import com..xdevice.rebottest.MainActivity;
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.model.RecordInfo;
+import com..xdevice.rebottest.utils.MyApplication;
+import com..xdevice.rebottest.utils.RecordAction;
+import com..xdevice.rebottest.utils.RecordManager;
+import com..xdevice.rebottest.utils.Utils;
+
+/**
+ * UiAutomator
+ * 
+ * @author y00202274
+ */
+@SuppressLint("NewApi")
+public class UiAutomatorRunner {
+
+	private static String TAG = "robot_UiAutomatorRunner";
+	public static String appName = "SoftRobot";
+
+	public static boolean bRecord = false;
+	private final Object mLock = new Object();
+	// 是否启动录制
+	public static boolean isStartRecord = false;
+
+	private static UiAutomatorRunner uiAutomatorRunner;
+	private static HandlerThread handlerThread;
+	private static UiAutomationShellWrapper uiAutomationShellWrapper;
+
+	/*
+	 * mMonkey设置为true时，在调用uiautomator后会导致手机侧的有些view控件不能正常被点击；
+	 * 比如：切换语言、开发者选项、联系人设置中的"联系人显示"等
+	 */
+	private boolean mMonkey = false;
+	private UiEventListener listener;
+	private static UiDevice uiDevice;
+
+	// zwx235140 2016/6/13
+	private static UiObject mUiObject = null;
+
+	// 记录是否产生了第一次有效的点击
+	// 只有产生并缓存了第一条记录之后，才可以开始缓存其他记录
+	public static boolean clickFirst = false;
+
+	public static UiAutomatorRunner getInstance() {
+		Logger.i(TAG, "invoke UiAutomatorRunner getInstance,pid:"
+				+ android.os.Process.myPid());
+		if (uiAutomatorRunner == null) {
+			Logger.i(TAG, "uiAutomatorRunner Instance == null");
+			uiAutomatorRunner = new UiAutomatorRunner();
+
+		}
+		/*
+		 * 处理N版本存在弹框后再次无法点击界面控件问题， 获取根节点失败后，重置相关连接
+		 */
+		// ###########Begin zwx235140 2016/6/13##########
+		else {
+			/*
+			 * 在连接成功之后，有出现非代码操作导致的连接断连 uiAutomatorRunner 不为null，但实际已断连 20160827
+			 */
+			if (uiAutomationShellWrapper != null
+					&& !uiAutomationShellWrapper.isConnected()) {
+				// 连接已异常断连，先重置连接
+				Logger.i(TAG,
+						"the uiautomation connection is broken.Reconnect it.");
+				resetRunner();
+			}
+
+			if (mUiObject == null) {
+				mUiObject = new UiObject(new UiSelector());
+			}
+
+			if (mUiObject.getRootNode() == null) {
+				Logger.i(TAG, "root node is null! reset UiAutomatorRunner!");
+				resetRunner();
+			}
+		}
+		// ###########End zwx2351402016/6/13##########
+		return uiAutomatorRunner;
+	}
+
+	public static void resetRunner() {
+		Logger.i(TAG, "reset UiAutomatorRunner!");
+		if (uiAutomatorRunner != null) {
+			if (uiAutomationShellWrapper != null) {
+				try {
+					uiAutomationShellWrapper.disconnect();
+				} catch (Exception e) {
+					Logger.e(TAG, "disconnect error. " + e.getMessage());
+				}
+			}
+			if (handlerThread != null) {
+				handlerThread.quit();
+			}
+			uiAutomatorRunner = null;
+			uiAutomatorRunner = new UiAutomatorRunner();
+		}
+	}
+
+	public UiAutomatorRunner() {
+		start();
+	}
+
+	public boolean initialize() {
+		Logger.i(TAG, "invoke initialize uiAutomatorRunner");
+		if (uiAutomatorRunner == null) {
+			Logger.i(TAG, "uiAutomatorRunner==null");
+			start();
+		}
+		return true;
+	}
+
+	public boolean start() {
+		Logger.i(TAG, "invoke start UiAutomatorHandlerThread");
+		try {
+			handlerThread = new HandlerThread("UiAutomatorHandlerThread");
+			handlerThread.setDaemon(true);
+			handlerThread.start();
+
+			uiAutomationShellWrapper = new UiAutomationShellWrapper();
+
+			Logger.i(TAG, " UiAutomationShellWrapper.connect() begin");
+			uiAutomationShellWrapper.connect();
+			Logger.i(TAG, " UiAutomationShellWrapper.connect() end");
+
+			uiAutomationShellWrapper.setRunAsMonkey(mMonkey);
+			uiDevice = UiDevice.getInstance();
+			uiDevice.initialize(new ShellUiAutomatorBridge(
+					uiAutomationShellWrapper.getUiAutomation()));
+
+			/**
+			 * 解决问题: 3、联系人模块，桌面快捷方式点击进入信息模块，
+			 * commom下的checkIfTextExist和checkIfIdExist和modle下的checkWidget检查有问题
+			 * ，使用这三个方法检查都失败，并且在短信界面输入8
+			 */
+			// UiWatcherManager.registerWatcher(uiDevice);
+			// uiDevice.runWatchers();
+
+			// Logger.i(TAG, "addEventListener");
+			// listener = new UiEventListener();
+			// uiDevice.addEventListener(listener);
+			Logger.i(TAG, "UiAutomatorRunner initialize ok");
+			return true;
+		} catch (Exception localException) {
+			Logger.e(
+					"UiAutomatorRunner start ERROR!",
+					localException.getClass() + ":"
+							+ localException.getMessage() + ".getCause:"
+							+ localException.getCause());
+			// uiAutomatorRunner = null;
+		}
+
+		return false;
+	}
+
+	public void stop() {
+		uiDevice.removeEventListener(listener);
+		uiAutomationShellWrapper.disconnect();
+		handlerThread.quit();
+		uiAutomatorRunner = null;
+	}
+
+	public void addListener() {
+		if (listener == null) {
+			listener = new UiEventListener();
+			uiDevice.addEventListener(listener);
+		}
+	}
+
+	public void removeListener() {
+		if (listener != null) {
+			uiDevice.removeEventListener(listener);
+			listener = null;
+		}
+	}
+
+	public void addDialogs(String title, String btn) {
+		addListener();
+		listener.addDialogs(title, btn);
+	}
+
+	public UiDevice getUiDevice() {
+		return uiDevice;
+	}
+
+	public void setUiDevice(UiDevice uiDevice) {
+		UiAutomatorRunner.uiDevice = uiDevice;
+	}
+
+	@SuppressLint("DefaultLocale")
+	private class UiEventListener implements EventListener {
+
+		private Map<String, String> dialogs = new HashMap<String, String>();
+
+		private String first_click_event_packname = "";
+
+		public void addDialogs(String title, String btn) {
+			dialogs.put(title, btn);
+		}
+
+		@Override
+		public void onAccessibilityEvent(AccessibilityEvent event) {
+			// bRecord = (Boolean)
+			// Utils.getDataFromFile(MyApplication.getContext(),"bRecord",
+			// "bool");
+			// clickFirst = (Boolean)
+			// Utils.getDataFromFile(MyApplication.getContext(),"clickFirst",
+			// "bool");
+//			handleAlertDialog(event);
+			Logger.i(TAG,
+					"onAccessibilityEvent,pid: " + android.os.Process.myPid());
+			Logger.i(TAG, "begin to record----------------------------------- "
+					+ bRecord);
+			Logger.i(TAG,
+					"begin to clickFirst----------------------------------- "
+							+ clickFirst);
+			if (!bRecord) {
+				Logger.i(TAG, "record already stoped!");
+				return;
+			}
+			// 过滤掉录制界面的任何事件
+			if ((event.getPackageName() != null)
+					&& (event.getPackageName()
+							.equals("com..xdevice.rebottest"))) {
+				return;
+			}
+			synchronized (mLock) {
+				// Logger.i(TAG,
+				// "EventTpye---------------" + event.toString());
+				// switch (event.getAction()) {
+				// case MotionEvent.ACTION_DOWN:
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_DOWN: " + event.toString());
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_DOWN:x" + event.getScrollX()
+				// + "y:" + event.getScrollY());
+				// Logger.i(TAG, "MotionEvent.ACTION_DOWN:"
+				// + event.getSource().toString());
+				// break;
+				// case MotionEvent.ACTION_UP:
+				// Logger.i(TAG, "MotionEvent.ACTION_UP: " + event.toString());
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_UP:x" + event.getScrollX()
+				// + "y:" + event.getScrollY());
+				// Logger.i(TAG, "MotionEvent.ACTION_UP:"
+				// + event.getSource().toString());
+				// break;
+				// case MotionEvent.ACTION_MOVE:
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_MOVE: " + event.toString());
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_MOVE:x" + event.getScrollX()
+				// + "y:" + event.getScrollY());
+				// Logger.i(TAG, "MotionEvent.ACTION_MOVE:"
+				// + event.getSource().toString());
+				// break;
+				// case MotionEvent.ACTION_SCROLL:
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_SCROLL: " + event.toString());
+				// Logger.i(TAG,
+				// "MotionEvent.ACTION_SCROLL:x" + event.getScrollX()
+				// + "y:" + event.getScrollY());
+				// Logger.i(TAG, "MotionEvent.ACTION_SCROLL:"
+				// + event.getSource().toString());
+				// break;
+				// case MotionEvent.ACTION_POINTER_UP:
+				//
+				// break;
+				// case MotionEvent.ACTION_HOVER_ENTER:
+				//
+				// break;
+				// default:
+				// break;
+				// }
+
+				Logger.i(TAG,
+						"robottest receive a AccessibilityEvent------------: "
+								+ event.toString());
+
+				int eventType = event.getEventType();
+				String eventName = AccessibilityEvent
+						.eventTypeToString(eventType);
+				Logger.i(TAG, "eventName: " + eventName);
+
+				switch (eventType) {
+				case AccessibilityEvent.TYPE_VIEW_CLICKED:
+					AccessibilityNodeInfo node = event.getSource();
+					if (node != null) {
+						Logger.i(TAG, "clicked node info:" + node.toString());
+					} else {
+						Logger.i(TAG, "clicked node info is null");
+						break;
+					}
+
+					if (!event.getPackageName().equals(
+							"com..xdevice.rebottest")) {
+						// clickFirst = (Boolean)
+						// Utils.getDataFromFile(MyApplication.getContext(),"clickFirst",
+						// "bool");
+						if (clickFirst) {
+							// 产生了第一次有效的点击事件
+							first_click_event_packname = (String) event
+									.getPackageName();
+							Logger.i(TAG, "MainActivityName:" + appName + ","
+									+ first_click_event_packname);
+						} else {
+							// 缓存控件点击记录
+							// 过滤掉其本身相关的点击事件
+							if ((node.getText() == null)
+									|| !node.getText().equals(appName)) {
+								RecordInfo record = new RecordInfo();
+								record.setActionType(RecordAction.ACTION_CLICK);
+								record.setNode(node);
+								RecordManager.addRecord(record);
+								Logger.i(TAG, "add click data");
+
+							}
+
+						}
+
+					}
+
+					break;
+
+				case AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED:
+					// 窗口状态发生变化，例如打开新的窗口界面
+					if (clickFirst) {
+						if (!event.getPackageName().equals(
+								first_click_event_packname)) {
+							// 缓存第一次有效的控件点击进入的acticity界面信息
+							String activityName = Utils.getActivityName();
+							RecordInfo record = new RecordInfo();
+							record.setActionType(RecordAction.ACTION_STARTACTIVITY);
+							record.setActivityName(activityName);
+							RecordManager.addRecord(record);
+							clickFirst = false;
+							Logger.i(TAG, "clickFirst = false");
+							Logger.i(TAG, "firstPackageName:" + activityName);
+						}
+					}
+					break;
+				case AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:
+					AccessibilityNodeInfo node1 = event.getSource();
+					if (node1 != null) {
+						Logger.i(TAG,
+								"AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED:"
+										+ node1.toString());
+					}
+					break;
+				case AccessibilityEvent.TYPE_VIEW_SCROLLED:
+					// AccessibilityNodeInfo node2 = event.getSource();
+					// Logger.i(TAG, "AccessibilityEvent.TYPE_VIEW_SCROLLED:"
+					// + event.toString());
+					// Logger.i(TAG, "AccessibilityEvent.TYPE_VIEW_SCROLLED:"
+					// + node2.toString());
+					// RecordInfo recordSwipe = new RecordInfo();
+					// recordSwipe.setActionType(RecordAction.ACTION_SWIPE);
+					// recordSwipe.setNode(event.getSource());
+					// RecordManager.addRecord(recordSwipe);
+					break;
+				case AccessibilityEvent.TYPE_VIEW_FOCUSED:
+					Logger.i(TAG, "TYPE_VIEW_FOCUSED");
+					if (event.getSource() != null) {
+						Logger.i(TAG,
+								"TYPE_VIEW_FOCUSED Event:" + event.toString());
+						RecordInfo recordFocus = new RecordInfo();
+						recordFocus.setActionType(RecordAction.ACTION_FOCUSED);
+						recordFocus.setNode(event.getSource());
+						RecordManager.addRecord(recordFocus);
+					} else {
+						Logger.i(TAG, "TYPE_VIEW_FOCUSED:getSource is null");
+					}
+					break;
+				case AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT:
+
+					break;
+				case AccessibilityEvent.TYPE_TOUCH_EXPLORATION_GESTURE_START:
+
+					break;
+				case AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED:
+
+					break;
+				case AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED:
+					Logger.i(TAG, "CONTENT_CHANGE_TYPE_TEXT");
+					Logger.i(
+							TAG,
+							"CONTENT_CHANGE_TYPE_TEXT Event:"
+									+ event.toString());
+					if (event.getSource() != null) {
+						RecordInfo record = new RecordInfo();
+						record.setActionType(RecordAction.ACTION_INPUT);
+						record.setNode(event.getSource());
+						record.setInput_text(event.getSource().getText()
+								.toString());
+						RecordManager.addRecord(record);
+					} else {
+						Logger.i(TAG,
+								"CONTENT_CHANGE_TYPE_TEXT:getSource is null");
+					}
+					break;
+
+				default:
+					break;
+				}
+
+				mLock.notifyAll();
+			}
+
+		}
+
+		private void handleAlertDialog(AccessibilityEvent event) {
+			Logger.i(TAG,"handleAlertDialog");
+			if (event.getText() != null && event.getText().size() > 0
+					&& event.getText().get(0) != null) {
+				String text = event.getText().get(0).toString();
+				if (event.getPackageName().equals("com.android.contacts")
+						&& event.getClassName().equals(
+								"android.app.AlertDialog")) {
+					Logger.i(TAG, "AccessibilityEvent Text: "
+							+ event.getText().get(0).toString());
+					Logger.i(TAG, "Listener: " + dialogs.toString());
+					clickButton(event, "Cancel");
+				}
+
+			}
+		}
+
+		private boolean clickButton(AccessibilityEvent event, String btn) {
+			AccessibilityNodeInfo source = event.getSource();
+			UiSelector selector = new UiSelector()
+					.className("android.widget.Button").text(btn).enabled(true);
+			if (source != null) {
+				AccessibilityNodeInfo node = uiDevice.getAutomatorBridge()
+						.getQueryController()
+						.translateRootNode(selector, source);
+				if (node != null) {
+					UiObject object = new UiObject(new UiSelector());
+					Logger.i(TAG, "Click button " + btn);
+					return object.clickWidget(node, "NORMAL", 800, 3000, false);
+				}
+			}
+
+			UiObject object = new UiObject(selector);
+			AccessibilityNodeInfo node = object.findNodeInfo(5000);
+			if (null != node
+					&& object.clickWidget(node, "NORMAL", 800, 3000, false)) {
+				Logger.i(TAG, "Click button " + btn);
+				return true;
+			}
+
+			Logger.e(TAG, "Not found button: " + btn);
+			return false;
+		}
+
+		/**
+		 * Current implementation ignores the exception and continues.
+		 */
+		private void postHandler() {
+			// TODO: Add custom error logging here
+			String formatedOutput = String.format(
+					"UI Exception Message: %-20s\n", UiDevice.getInstance()
+							.getCurrentPackageName());
+			Logger.e(TAG, formatedOutput);
+
+			UiObject btnClose = new UiObject(new UiSelector().text("CLOSE APP")
+					.enabled(true));
+			AccessibilityNodeInfo nodeClose2 = btnClose.findNodeInfo(5000);
+			if (null != nodeClose2
+					&& btnClose.clickWidget(nodeClose2, "NORMAL", 800, 3000,
+							false)) {
+				Logger.i(TAG, "Click button [CLOSE APP]");
+				return;
+			}
+
+			UiObject btnClose1 = new UiObject(new UiSelector()
+					.text("Close app").enabled(true));
+			AccessibilityNodeInfo nodeClose = btnClose1.findNodeInfo(5000);
+			if (null != nodeClose
+					&& btnClose1.clickWidget(nodeClose, "NORMAL", 800, 3000,
+							false)) {
+				Logger.i(TAG, "Click button [Close app]");
+				return;
+			}
+
+			UiObject btnOK = new UiObject(new UiSelector().text("OK").enabled(
+					true));
+			// sometimes it takes a while for the OK button to become enabled
+			AccessibilityNodeInfo node = btnOK.findNodeInfo(5000);
+			if (null != node
+					&& btnOK.clickWidget(node, "NORMAL", 800, 3000, false)) {
+				Logger.i(TAG, "Click button [OK]");
+				return;
+			}
+		}
+
+	}
+}
