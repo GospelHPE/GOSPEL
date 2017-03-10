@@ -1,0 +1,125 @@
+package com..xdevice.rebottest.model;
+
+import java.io.Serializable;
+
+import android.view.accessibility.AccessibilityNodeInfo;
+
+public class RecordInfo implements Serializable {
+
+	private static final long serialVersionUID = 1000;
+	private int actionType;
+
+	private AccessibilityNodeInfo node;
+
+	private String activityName;
+
+	private String input_text;
+
+	public String getInput_text() {
+		return input_text;
+	}
+
+	public void setInput_text(String input_text) {
+		if (input_text == null)
+		{
+			input_text = "";
+		}
+		this.input_text = input_text;
+	}
+
+	public int getActionType() {
+		return actionType;
+	}
+
+	public void setActionType(int actionType) {
+		this.actionType = actionType;
+	}
+
+	public AccessibilityNodeInfo getNode() {
+		return node;
+	}
+
+	public void setNode(AccessibilityNodeInfo node) {
+		this.node = node;
+	}
+
+	public String getActivityName() {
+		return activityName;
+	}
+
+	public void setActivityName(String activityName) {
+		this.activityName = activityName;
+	}
+
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append(super.toString());
+		builder.append("RecordInfo=[");
+		builder.append("ActionType:").append(actionType);
+		builder.append(";ActivityName:").append(activityName);
+		builder.append(";input_text:").append(input_text);
+
+		if (node != null) {
+			builder.append(";Node:").append(node.toString());
+		} else {
+			builder.append(";Node:").append("null");
+		}
+		builder.append("]");
+		return builder.toString();
+	}
+
+}
+
+
+-------------------------------------
+
+package com..xdevice.rebottest.model;
+
+public class SwipeClickNode {
+	private String id;
+	private String text;
+	private String desc;
+	private String x;
+	private String y;
+
+	public String getId() {
+		return id;
+	}
+
+	public void setId(String id) {
+		this.id = id;
+	}
+
+	public String getText() {
+		return text;
+	}
+
+	public void setText(String text) {
+		this.text = text;
+	}
+
+	public String getDesc() {
+		return desc;
+	}
+
+	public void setDesc(String desc) {
+		this.desc = desc;
+	}
+
+	public String getX() {
+		return x;
+	}
+
+	public void setX(String x) {
+		this.x = x;
+	}
+
+	public String getY() {
+		return y;
+	}
+
+	public void setY(String y) {
+		this.y = y;
+	}
+}
