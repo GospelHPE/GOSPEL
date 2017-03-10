@@ -1,0 +1,308 @@
+package com..xdevice.rebottest.bar;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
+import android.os.Handler;
+import android.os.Message;
+import android.view.View;
+
+public class EatBeanMan extends View {
+	Paint paintC;
+	Paint paintEye;
+
+	public EatBeanMan(Context context) {
+		super(context);
+		// TODO 自动生成的构造函数存根
+		paintC = new Paint();
+		paintC.setColor(Color.YELLOW);
+		paintC.setAntiAlias(true);
+		paintEye = new Paint();
+		paintEye.setColor(Color.BLACK);
+		paintEye.setAntiAlias(true);
+	}
+
+	boolean isDrawing = false;
+
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		// TODO 自动生成的方法存根
+		int wMeasure = MeasureSpec.makeMeasureSpec(300, MeasureSpec.EXACTLY);
+		int hMeasure = wMeasure;
+		if (!isDrawing) {
+			mHandler.sendEmptyMessage(101);
+			isDrawing = true;
+			rectF = new RectF(0, 0, 300, 300);
+		}
+		super.onMeasure(wMeasure, hMeasure);
+	}
+
+	/**
+	 * 吃豆人开始角度
+	 */
+	int startAngle = 45;
+	/**
+	 * 吃豆人的要画的度数
+	 */
+	int sweepAngle = 270;
+	/**
+	 * 吃豆人每两次显示绘制开始角度的差值，大于0咬，小于0张嘴
+	 */
+	int csAngle = -10;
+	/**
+	 * 吃豆人每两次显示绘制度数的差值，大于0咬，小于0张嘴
+	 */
+	int cAngle = 20;
+	Handler mHandler = new Handler(new Handler.Callback() {
+
+		@Override
+		public boolean handleMessage(Message msg) {
+			// TODO 自动生成的方法存根
+			switch (msg.what) {
+			case 101:
+				invalidate();
+				if (sweepAngle >= 360) {
+					csAngle = 10;
+					cAngle = -20;
+				} else if (sweepAngle <= 270) {
+					csAngle = -10;
+					cAngle = 20;
+				}
+				startAngle += csAngle;
+				sweepAngle += cAngle;
+				mHandler.sendEmptyMessageDelayed(101, 40);
+				break;
+
+			}
+			return false;
+		}
+	});
+	RectF rectF;
+
+	@Override
+	protected void onDraw(Canvas canvas) {
+		canvas.drawArc(rectF, startAngle, sweepAngle, true, paintC);
+		canvas.drawCircle(rectF.right / 5 * 3, rectF.bottom / 4, 10, paintEye);
+	}
+}
+
+
+
+
+------------------------------
+
+
+package com..xdevice.rebottest.bar;
+
+import android.app.Service;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.PixelFormat;
+import android.os.IBinder;
+import android.provider.Settings;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.View.OnTouchListener;
+import android.view.WindowManager;
+import android.view.WindowManager.LayoutParams;
+import android.widget.ImageButton;
+
+import com..xdevice.rebottest.R;
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.runner.UiAutomatorRunner;
+import com..xdevice.rebottest.utils.MyApplication;
+import com..xdevice.rebottest.utils.RecordManager;
+
+public class FloatWindowService extends Service {
+	private static final String TAG = "FloatWindowService";
+	View floatView;
+	WindowManager mWindowManager;
+	LayoutParams wmParams;
+	int sW;
+	int sH;
+	EatBeanMan eatBeanMan;
+	LayoutParams eatParams;
+	boolean hasAddEat = false;
+	ImageButton startRecord ;
+	ImageButton stopRecord ;
+	ImageButton backRecord ;
+	Boolean isStartRecord = false;
+	Boolean isStartPlay = true;
+	String defaultInputMethod;
+	
+	@Override
+	public IBinder onBind(Intent intent) {
+		// TODO 自动生成的方法存根
+		return null;
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		// TODO 自动生成的方法存根
+		createFloatView();
+		initUi();
+		Logger.i(TAG, "onStartCommand,pid:" + android.os.Process.myPid());
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	private void createFloatView() {
+		mWindowManager = (WindowManager) getApplication().getSystemService(Context.WINDOW_SERVICE);
+		sW = mWindowManager.getDefaultDisplay().getWidth();
+		sH = mWindowManager.getDefaultDisplay().getHeight();
+		initWindowParams();// 初始化WindowParams
+		LayoutInflater inflater = LayoutInflater.from(getApplicationContext());
+		floatView = inflater.inflate(R.layout.bo_view, null);
+		mWindowManager.addView(floatView, wmParams);
+		// 至此悬浮窗已经显示出来了，后面的只是监听触摸事件
+		View bo = floatView.findViewById(R.id.record);
+		bo.setOnTouchListener(new OnTouchListener() {
+
+			@Override
+			public boolean onTouch(View v, MotionEvent event) {
+				return false;
+			}
+		});
+	}
+
+	private void initWindowParams() {
+		wmParams = new LayoutParams();
+		wmParams.type = LayoutParams.TYPE_SYSTEM_ALERT;// 特别注意在这里设置等级为系统警告
+		wmParams.format = PixelFormat.RGBA_8888;
+		wmParams.flags = LayoutParams.FLAG_NOT_FOCUSABLE;
+		wmParams.gravity = Gravity.START | Gravity.CENTER;
+		wmParams.x = 0;
+		wmParams.y = 0;
+		wmParams.width = 100;
+		wmParams.height = 500;
+//		eatParams = new LayoutParams();
+//		eatParams.type = LayoutParams.TYPE_SYSTEM_ALERT;
+//		eatParams.format = PixelFormat.RGBA_8888;
+//		eatParams.flags = LayoutParams.FLAG_NOT_FOCUSABLE;
+//		eatParams.gravity = Gravity.LEFT | Gravity.TOP;
+//		eatParams.x = 0;
+//		eatParams.y = sH / 2 - 150;
+//		eatParams.width = 300;
+//		eatParams.height = 300;
+	}
+
+	@Override
+	public void onDestroy() {
+//		if (hasAddEat) {
+//			mWindowManager.removeView(eatBeanMan);
+//		}
+		mWindowManager.removeView(floatView);
+		super.onDestroy();
+	}
+	private void initUi() {
+		startRecord = (ImageButton) floatView.findViewById(R.id.begin_record);
+		stopRecord = (ImageButton) floatView.findViewById(R.id.end_record);
+		backRecord = (ImageButton) floatView.findViewById(R.id.paly_record);
+
+		startRecord.setOnClickListener(new View.OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if(!isStartRecord){
+					Logger.i(TAG, "开始录制---------- ");
+				UiAutomatorRunner.getInstance().initialize();
+				UiAutomatorRunner.bRecord = true;
+				isStartRecord = true;
+				UiAutomatorRunner.clickFirst = true;
+				RecordManager.recordList.clear();
+				registerEventListener();
+				}else{
+					Logger.i(TAG, "已经开始录制---------- ");
+				}
+				GotoHome();
+			}
+		});
+
+		stopRecord.setOnClickListener(new View.OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if(isStartRecord){
+				UiAutomatorRunner.bRecord = false;
+				isStartRecord = false;
+				UiAutomatorRunner.clickFirst = false;
+				Logger.i(TAG, "结束录制---------- ");
+				}else{
+					Logger.i(TAG, "还未启动录制---------- ");
+				}
+				Logger.i(TAG, "Record size: "+RecordManager.recordList.size());
+			}
+		});
+		
+		backRecord.setOnClickListener(new View.OnClickListener() {
+
+			@Override
+			public void onClick(View v) {
+				if(isStartPlay){
+				isStartPlay = false;
+				Logger.i(TAG, "开始回放---------- ");
+				GotoHome();
+				
+				 defaultInputMethod = Settings.Secure.getString(MyApplication.getContext().getContentResolver(), "default_input_method");
+				Logger.i(TAG, "当前默认输入法是---------- "+defaultInputMethod);
+				Settings.Secure.putString(MyApplication.getContext().getContentResolver(), "default_input_method","jp.jun_nama.test.utf7ime/.Utf7ImeService");
+				Logger.i(TAG, "设置默认输入法为---------- "+"jp.jun_nama.test.utf7ime/.Utf7ImeService");
+				RecordManager.runRecords(RecordManager.recordList);
+				Logger.i(TAG, "还原默认输入法是---------- "+defaultInputMethod);
+				Settings.Secure.putString(MyApplication.getContext().getContentResolver(), "default_input_method",defaultInputMethod);
+				isStartPlay = true;
+				}else{
+					Logger.i(TAG, "已经在回放---------- ");
+				}
+				}
+		});
+
+	}
+	/**
+	 * 注册事件监听事件
+	 * 
+	 * @param context
+	 * @param params
+	 */
+	private void registerEventListener() {
+		Logger.i(TAG, "registerEventListener!");
+		UiAutomatorRunner.getInstance().addListener();
+	}
+	public void GotoHome() {
+		// 隐藏activity到后台,打开HOME Launcher
+		PackageManager pm = getPackageManager();
+		ResolveInfo homeInfo = pm.resolveActivity(
+				new Intent(Intent.ACTION_MAIN)
+						.addCategory(Intent.CATEGORY_HOME), 0);
+		ActivityInfo ai = homeInfo.activityInfo;
+		Intent startIntent = new Intent(Intent.ACTION_MAIN);
+		startIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		startIntent.setComponent(new ComponentName(ai.packageName, ai.name));
+		startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			startActivity(startIntent);
+		} catch (ActivityNotFoundException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+		} catch (SecurityException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+			Logger.e(
+					TAG,
+					"Launcher does not have the permission to launch "
+							+ startIntent
+							+ ". Make sure to create a MAIN intent-filter for the corresponding activity "
+							+ "or use the exported attribute for this activity."
+							+ e);
+		}
+	}
+}
+
+
+
