@@ -1,0 +1,147 @@
+package com..xdevice.rebottest.log;
+
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
+import android.annotation.SuppressLint;
+import android.util.Log;
+
+/**
+ * Logger
+ * 
+ * @author y00202274
+ */
+@SuppressLint("SimpleDateFormat")
+public class Logger {
+
+	private static OutputStreamWriter writer;
+	private static WriteThread writeThread = null;
+
+	public static void i(String tag, String msg) {
+		Log.i(tag, msg);
+		write(tag, msg);
+	}
+
+	public static void e(String tag, String msg) {
+		Log.e(tag, msg);
+		write(tag, msg);
+	}
+
+	private static void write(String tag, String msg) {
+		Date time = new Date();
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss:SSS");
+		String dsNow = sdf.format(time);
+		String str = "log level i " + dsNow + "    " + tag + "  " + msg;
+		if (writeThread == null || !writeThread.isWriteThreadLive) {// 监察写线程是否工作中，没有
+																	// 则创建
+			writeThread = new WriteThread();
+			writeThread.start();
+		}
+
+		writeThread.linkedQueue.add(str);
+	}
+
+	public static void close() {
+		if (writer != null) {
+			try {
+				writer.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		if (writeThread != null) {
+			writeThread.isWriteThreadLive = false;
+			writeThread = null;
+		}
+
+	}
+}
+
+----------------------------
+
+package com..xdevice.rebottest.log;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.concurrent.ConcurrentLinkedQueue;
+
+import android.annotation.SuppressLint;
+
+import com.google.gson.Gson;
+
+@SuppressLint("SdCardPath")
+public class WriteThread extends Thread {
+
+	public boolean isWriteThreadLive = false;// 写日志线程是否已经在运行了
+
+	private static final String LOG_DIR = "/mnt/sdcard/xDevice/";
+	private static final String LOG_SERVICE_LOG_PATH = LOG_DIR
+			+ "robotTest.txt";
+
+	public ConcurrentLinkedQueue<Object> linkedQueue = new ConcurrentLinkedQueue<Object>();
+
+	public WriteThread() {
+		File file = new File(LOG_SERVICE_LOG_PATH);
+		if (file.exists()) {
+			// 日志文件超过50M备份
+			if (file.length() > 50 * 1024 * 1024) {
+				File file1 = new File(LOG_DIR + "xDeviceService_bak.txt");
+				if (file1.exists()) {
+					file1.delete();
+				}
+
+				file.renameTo(file1);
+			}
+		}
+	}
+
+	@Override
+	public void run() {
+		isWriteThreadLive = true;
+		Gson gson = new Gson();
+		while (!linkedQueue.isEmpty()) {// 对列不空时
+			try {
+				// 写日志到SD卡
+				recordStringLog(gson.toJson(linkedQueue.poll()));
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+
+		isWriteThreadLive = false;// 队列中的日志都写完了，关闭线程（也可以常开 要测试下）
+	}
+
+	/**
+	 * 打开日志文件并写入日志
+	 * 
+	 * @return
+	 * **/
+	private void recordStringLog(String text) {// 新建或打开日志文件
+		File file = new File(LOG_SERVICE_LOG_PATH);
+		if (!file.exists()) {
+			file.getParentFile().mkdirs();
+			try {
+				file.createNewFile();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+		try {
+			FileWriter filerWriter = new FileWriter(file, true);// 后面这个参数代表是不是要接上文件中原来的数据，不进行覆盖
+			BufferedWriter bufWriter = new BufferedWriter(filerWriter);
+			bufWriter.write(text);
+			bufWriter.newLine();
+			bufWriter.close();
+			filerWriter.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+}
