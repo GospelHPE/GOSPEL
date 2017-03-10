@@ -1,0 +1,187 @@
+package com..xdevice.rebottest;
+
+import android.app.Activity;
+import android.app.AppOpsManager;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.os.Bundle;
+import android.view.MotionEvent;
+
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.runner.UiAutomatorRunner;
+import com..xdevice.rebottest.utils.Utils;
+
+public class MainActivity extends Activity {
+
+	private static final String TAG = "robot_main_activity";
+	private boolean isStartRecordService = false;
+
+	public static String appName = "SoftRobot";
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+		if (savedInstanceState != null) {
+			isStartRecordService = savedInstanceState
+					.getBoolean("recordService");
+			Logger.i(TAG, "get Save instance" + UiAutomatorRunner.clickFirst
+					+ ";" + UiAutomatorRunner.bRecord + ","
+					+ UiAutomatorRunner.isStartRecord);
+		}
+		Logger.i(TAG, "onCreate,pid:" + android.os.Process.myPid());
+	if(!isStartRecordService){
+		Utils.setMode(AppOpsManager.OP_SYSTEM_ALERT_WINDOW);
+		startService(new Intent(
+				MainActivity.this,
+				com..xdevice.rebottest.bar.FloatWindowService.class));
+		GotoHome();
+		isStartRecordService = true;
+	  }
+	GotoHome();
+	}
+	
+	
+	@Override
+	public boolean onTouchEvent(MotionEvent event){
+		return isStartRecordService;
+		
+	}
+	
+	
+	public void GotoHome() {
+		// 隐藏activity到后台,打开HOME Launcher
+		PackageManager pm = getPackageManager();
+		ResolveInfo homeInfo = pm.resolveActivity(
+				new Intent(Intent.ACTION_MAIN)
+						.addCategory(Intent.CATEGORY_HOME), 0);
+		ActivityInfo ai = homeInfo.activityInfo;
+		Intent startIntent = new Intent(Intent.ACTION_MAIN);
+		startIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		startIntent.setComponent(new ComponentName(ai.packageName, ai.name));
+		startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			startActivity(startIntent);
+		} catch (ActivityNotFoundException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+		} catch (SecurityException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+			Logger.e(
+					TAG,
+					"Launcher does not have the permission to launch "
+							+ startIntent
+							+ ". Make sure to create a MAIN intent-filter for the corresponding activity "
+							+ "or use the exported attribute for this activity."
+							+ e);
+		}
+	}
+@Override
+protected void onResume() {
+	// TODO Auto-generated method stub
+	GotoHome();
+	super.onResume();
+}
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		// TODO Auto-generated method stub
+		super.onSaveInstanceState(outState);
+		outState.putBoolean("recordService", isStartRecordService);
+	}
+}
+
+
+---------------------------------------
+
+
+
+package com..xdevice.rebottest;
+
+import android.app.Activity;
+import android.app.AppOpsManager;
+import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.os.Bundle;
+
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.runner.UiAutomatorRunner;
+import com..xdevice.rebottest.utils.Utils;
+
+public class ViewTest extends Activity {
+
+	private static final String TAG = "robot_main_activity";
+	private boolean isStartRecordService = false;
+
+	public static String appName = "SoftRobot";
+	
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
+		if (savedInstanceState != null) {
+			isStartRecordService = savedInstanceState
+					.getBoolean("recordService");
+			Logger.i(TAG, "get Save instance" + UiAutomatorRunner.clickFirst
+					+ ";" + UiAutomatorRunner.bRecord + ","
+					+ UiAutomatorRunner.isStartRecord);
+		}
+		Logger.i(TAG, "onCreate,pid:" + android.os.Process.myPid());
+	if(!isStartRecordService){
+		Utils.setMode(AppOpsManager.OP_SYSTEM_ALERT_WINDOW);
+		startService(new Intent(
+				ViewTest.this,
+				com..xdevice.rebottest.bar.FloatWindowService.class));
+		GotoHome();
+		isStartRecordService = true;
+	  }
+	GotoHome();
+	}
+	public void GotoHome() {
+		// 隐藏activity到后台,打开HOME Launcher
+		PackageManager pm = getPackageManager();
+		ResolveInfo homeInfo = pm.resolveActivity(
+				new Intent(Intent.ACTION_MAIN)
+						.addCategory(Intent.CATEGORY_HOME), 0);
+		ActivityInfo ai = homeInfo.activityInfo;
+		Intent startIntent = new Intent(Intent.ACTION_MAIN);
+		startIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		startIntent.setComponent(new ComponentName(ai.packageName, ai.name));
+		startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			startActivity(startIntent);
+		} catch (ActivityNotFoundException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+		} catch (SecurityException e) {
+			Logger.i(TAG, "not found Activity error=" + e.getMessage());
+			Logger.e(
+					TAG,
+					"Launcher does not have the permission to launch "
+							+ startIntent
+							+ ". Make sure to create a MAIN intent-filter for the corresponding activity "
+							+ "or use the exported attribute for this activity."
+							+ e);
+		}
+	}
+@Override
+protected void onResume() {
+	// TODO Auto-generated method stub
+	GotoHome();
+	super.onResume();
+}
+	@Override
+	protected void onSaveInstanceState(Bundle outState) {
+		// TODO Auto-generated method stub
+		super.onSaveInstanceState(outState);
+		outState.putBoolean("recordService", isStartRecordService);
+	}
+}
+
+
+
