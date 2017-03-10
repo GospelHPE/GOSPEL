@@ -1,0 +1,1023 @@
+package com..xdevice.rebottest.utils;
+
+import android.app.Application;
+import android.content.Context;
+
+public class MyApplication extends Application {
+	private static Context context;
+
+	@Override
+	public void onCreate() {
+		// TODO Auto-generated method stub
+		super.onCreate();
+		context = getApplicationContext();
+	}
+
+	public static Context getContext() {
+		return context;
+	}
+}
+
+---------------------------------------
+
+
+package com..xdevice.rebottest.utils;
+
+/**
+ * 定义回放动作类型
+ * 
+ * @author zWX235140
+ * 
+ */
+public class RecordAction {
+
+	// start activity
+	public static final int ACTION_STARTACTIVITY = 0;
+
+	// click node
+	public static final int ACTION_CLICK = 1;
+
+	// input text
+	public static final int ACTION_INPUT = 2;
+	// focused action
+	public static final int ACTION_FOCUSED = 3;
+	//swipe action
+	public static final int ACTION_SWIPE = 4;
+}
+
+
+-------------------
+
+
+
+package com..xdevice.rebottest.utils;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.model.RecordInfo;
+
+public class RecordManager {
+
+	private static final String TAG = "RecordManager";
+	public static List<RecordInfo> recordList = new ArrayList<RecordInfo>();
+
+	public static void addRecord(RecordInfo record) {
+		Logger.i(TAG, "addRecord--->>" + record.toString());
+		recordList.add(record);
+		Logger.i(TAG, "addRecord--->>:" + recordList.size());
+	}
+
+	public static void runRecords(List<RecordInfo> records) {
+
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		int size = records.size();
+		Logger.i(TAG, "Start run records! Total Size:" + size);
+		if (records.size() > 0) {
+			//input RecordInfo
+			RecordInfo lastInputRecord = null;
+			boolean isLastInputRecord = false;
+//			//scroll info
+//			RecordInfo beginScrollRecord = null;
+//			RecordInfo endScrollRecord = null;
+//			boolean isLastSwipeRecord = false;
+			
+			for ( int i = 0;i < size; i ++) {
+				RecordInfo record = records.get(i);
+				Logger.i(TAG, "[Run Record] " + record.toString());
+				int actionType = record.getActionType();
+				//过滤掉此次输入事件前面的不完全的文本，直接取最后一次完整的文本信息
+				if(RecordAction.ACTION_INPUT == actionType){
+					lastInputRecord = record;
+					isLastInputRecord = true;
+					if(i == size -1){
+						// 输入文本
+						Logger.i(TAG, "last record 输入文本" + lastInputRecord.getInput_text());
+						Utils.sendText(lastInputRecord.getNode(), lastInputRecord.getInput_text());
+						isLastInputRecord = false;
+					}
+					continue;
+				}else{
+					if(isLastInputRecord){
+						// 输入文本
+						Logger.i(TAG, "输入文本" + lastInputRecord.getInput_text());
+						Utils.sendText(lastInputRecord.getNode(), lastInputRecord.getInput_text());
+						isLastInputRecord = false;
+					}
+				}
+//				//过滤掉中间的滑动过程，只需要起始和结束的滑动数据
+//				if(RecordAction.ACTION_SWIPE == actionType){
+//					 beginScrollRecord = endScrollRecord;
+//					 endScrollRecord = record;
+//					 isLastSwipeRecord = true;
+//					 if((i == size -1)&&(beginScrollRecord != null)){
+//							//滑动
+//							Logger.i(TAG, "last record 滑动" );
+//							Utils.swipe(beginScrollRecord.getNode(),endScrollRecord.getNode(), 15);
+//							isLastSwipeRecord = false;
+//						}
+//						continue;
+//				}else{
+//					if(isLastSwipeRecord){
+//						if(beginScrollRecord != null){
+//							//滑动
+//							Logger.i(TAG, "last record 滑动" );
+//							Utils.swipe(beginScrollRecord.getNode(),endScrollRecord.getNode(), 15);
+//							isLastSwipeRecord = false;
+//						}
+//					}
+//				}
+				
+				switch (actionType) {
+				case RecordAction.ACTION_STARTACTIVITY:
+					// 打开指定activity
+					Utils.startActivity(record.getActivityName());
+					break;
+				case RecordAction.ACTION_CLICK:
+					// 点击控件
+					Logger.i(TAG, "点击控件");
+					Utils.click(record.getNode());
+//					beginScrollRecord = null;
+//					endScrollRecord = null;
+					break;
+				case RecordAction.ACTION_FOCUSED:
+					// 点击控件,使其获取焦点
+					Logger.i(TAG, "点击控件,使其获取焦点");
+					Utils.setFocus(record.getNode());
+//					Utils.click(record.getNode());
+//					beginScrollRecord = null;
+//					endScrollRecord = null;
+					break;
+				case RecordAction.ACTION_SWIPE:
+					// 屏幕滑动
+//					Logger.i(TAG, "滑动控件");
+//					 beginScrollRecord = endScrollRecord;
+//					 endScrollRecord = record;
+//					 boolean bSwipe = false;
+//					 if(beginScrollRecord != null){
+//						 bSwipe = Utils.swipe(beginScrollRecord.getNode(), endScrollRecord.getNode(),15) ;
+//						 if(!bSwipe){
+//							continue;
+//						 }
+//					 }
+					break;
+				default:
+					break;
+				}
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+
+		} else {
+			Logger.e(TAG, "回放记录队列为空!");
+		}
+	}
+}
+
+
+
+-----------------------
+
+package com..xdevice.rebottest.utils;
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.List;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Binder;
+import android.os.Build.VERSION;
+import android.os.IBinder;
+import android.util.Log;
+
+import com..xdevice.rebottest.MainActivity;
+import com..xdevice.rebottest.R;
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.model.RecordInfo;
+import com..xdevice.rebottest.runner.UiAutomatorRunner;
+
+public class RobotService extends Service {
+
+	private static final String TAG = "RobotService";
+	public RecordBinder recordBinder = new RecordBinder();
+	
+	   
+    private boolean mReflectFlg = false;  
+      
+    private static final int NOTIFICATION_ID = 1; // 如果id设置为0,会导致不能设置为前台service  
+    private static final Class<?>[] mSetForegroundSignature = new Class[] {  
+        boolean.class};  
+    private static final Class<?>[] mStartForegroundSignature = new Class[] {  
+        int.class, Notification.class};  
+    private static final Class<?>[] mStopForegroundSignature = new Class[] {  
+        boolean.class};  
+  
+    private NotificationManager mNM;    
+    private Method mSetForeground;  
+    private Method mStartForeground;    
+    private Method mStopForeground;  
+    private Object[] mSetForegroundArgs = new Object[1];  
+    private Object[] mStartForegroundArgs = new Object[2];    
+    private Object[] mStopForegroundArgs = new Object[1];  
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		// TODO Auto-generated method stub
+		return recordBinder;
+	}
+
+	@Override
+	public void onCreate() {
+		Logger.i(TAG, "RobotService onCreate.");
+		 mNM = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);    
+	        try {    
+	            mStartForeground = RobotService.class.getMethod("startForeground", mStartForegroundSignature);    
+	            mStopForeground = RobotService.class.getMethod("stopForeground", mStopForegroundSignature);    
+	        } catch (NoSuchMethodException e) {    
+	            mStartForeground = mStopForeground = null;    
+	        }    
+	          
+	        try {  
+	            mSetForeground = getClass().getMethod("setForeground",  
+	                    mSetForegroundSignature);  
+	        } catch (NoSuchMethodException e) {  
+	            throw new IllegalStateException(  
+	                    "OS doesn't have Service.startForeground OR Service.setForeground!");  
+	        }  
+	  
+	        Notification.Builder builder = new Notification.Builder(this);  
+	        PendingIntent contentIntent = PendingIntent.getActivity(this, 0,    
+	                new Intent(this, MainActivity.class), 0);    
+	        builder.setContentIntent(contentIntent);  
+	        builder.setSmallIcon(R.drawable.ic_launcher);  
+	        builder.setTicker("Foreground Service Start");  
+	        builder.setContentTitle("Foreground Service");  
+	        builder.setContentText("Make this service run in the foreground.");  
+	        Notification notification = builder.build();  
+	          
+	        startForegroundCompat(NOTIFICATION_ID, notification);  
+	     
+	}
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+	
+		registerEventListener();
+		
+			Logger.i(TAG, "RobotService onStartCommand.pid:"
+					+ android.os.Process.myPid());
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	/**
+	 * 注册事件监听事件
+	 * 
+	 * @param context
+	 * @param params
+	 */
+	private void registerEventListener() {
+		Logger.i(TAG, "registerEventListener!");
+		UiAutomatorRunner.getInstance().addListener();
+	}
+
+	public class RecordBinder extends Binder {
+		private List<RecordInfo> records;
+
+		public List<RecordInfo> getRecords() {
+			setRecords(RecordManager.recordList);
+			Logger.i(TAG, "List<RecordInfo> getRecords!:"
+					+ RecordManager.recordList.size());
+			return this.records;
+		}
+
+		public void setRecords(List<RecordInfo> records) {
+			this.records = records;
+		}
+
+		public void setRecordFlag(boolean bRecord) {
+			Logger.i(TAG, "setRecordFlag:" + bRecord);
+			UiAutomatorRunner.bRecord = bRecord;
+		}
+
+		public void setClickFirstFlag(boolean clickFirst) {
+			Logger.i(TAG, "setRecordFlag:" + clickFirst);
+			UiAutomatorRunner.clickFirst = clickFirst;
+		}
+
+		public void setStartRecordFlag(boolean bStartRecord) {
+			Logger.i(TAG, "setRecordFlag:" + bStartRecord);
+			UiAutomatorRunner.isStartRecord = bStartRecord;
+		}
+
+		public void setAppName(String appName) {
+			Logger.i(TAG, "setRecordFlag:" + appName);
+			UiAutomatorRunner.appName = appName;
+		}
+
+		public boolean getRecordFlag() {
+			Logger.i(TAG, "getRecordFlag:" + UiAutomatorRunner.bRecord);
+			return UiAutomatorRunner.bRecord;
+		}
+
+		public boolean getClickFirstFlag() {
+			return UiAutomatorRunner.clickFirst;
+		}
+
+		public boolean getStartRecordFlag() {
+			return UiAutomatorRunner.bRecord;
+		}
+
+		public String getAppName() {
+			return UiAutomatorRunner.appName;
+		}
+	}
+	void invokeMethod(Method method, Object[] args) {  
+        try {  
+            method.invoke(this, args);  
+        } catch (InvocationTargetException e) {  
+            // Should not happen.  
+            Log.w("ApiDemos", "Unable to invoke method", e);  
+        } catch (IllegalAccessException e) {  
+            // Should not happen.  
+            Log.w("ApiDemos", "Unable to invoke method", e);  
+        }  
+    }  
+      
+    /** 
+     * This is a wrapper around the new startForeground method, using the older 
+     * APIs if it is not available. 
+     */  
+    void startForegroundCompat(int id, Notification notification) {  
+        if (mReflectFlg) {  
+            // If we have the new startForeground API, then use it.  
+            if (mStartForeground != null) {  
+                mStartForegroundArgs[0] = Integer.valueOf(id);  
+                mStartForegroundArgs[1] = notification;  
+                invokeMethod(mStartForeground, mStartForegroundArgs);  
+                return;  
+            }  
+      
+            // Fall back on the old API.  
+            mSetForegroundArgs[0] = Boolean.TRUE;  
+            invokeMethod(mSetForeground, mSetForegroundArgs);  
+            mNM.notify(id, notification);  
+        } else {  
+            /* 还可以使用以下方法，当sdk大于等于5时，调用sdk现有的方法startForeground设置前台运行， 
+             * 否则调用反射取得的sdk level 5（对应Android 2.0）以下才有的旧方法setForeground设置前台运行 */  
+              
+            if(VERSION.SDK_INT >= 5) {  
+                startForeground(id, notification);  
+            } else {  
+                // Fall back on the old API.  
+                mSetForegroundArgs[0] = Boolean.TRUE;  
+                invokeMethod(mSetForeground, mSetForegroundArgs);  
+                mNM.notify(id, notification);      
+            }  
+        }  
+    }  
+  
+    /** 
+     * This is a wrapper around the new stopForeground method, using the older 
+     * APIs if it is not available. 
+     */  
+    void stopForegroundCompat(int id) {  
+        if (mReflectFlg) {  
+            // If we have the new stopForeground API, then use it.  
+            if (mStopForeground != null) {  
+                mStopForegroundArgs[0] = Boolean.TRUE;  
+                invokeMethod(mStopForeground, mStopForegroundArgs);  
+                return;  
+            }  
+      
+            // Fall back on the old API.  Note to cancel BEFORE changing the  
+            // foreground state, since we could be killed at that point.  
+            mNM.cancel(id);  
+            mSetForegroundArgs[0] = Boolean.FALSE;  
+            invokeMethod(mSetForeground, mSetForegroundArgs);  
+        } else {  
+            /* 还可以使用以下方法，当sdk大于等于5时，调用sdk现有的方法stopForeground停止前台运行， 
+             * 否则调用反射取得的sdk level 5（对应Android 2.0）以下才有的旧方法setForeground停止前台运行 */  
+              
+            if(VERSION.SDK_INT >= 5) {  
+                stopForeground(true);  
+            } else {  
+                // Fall back on the old API.  Note to cancel BEFORE changing the  
+                // foreground state, since we could be killed at that point.  
+                mNM.cancel(id);  
+                mSetForegroundArgs[0] = Boolean.FALSE;  
+                invokeMethod(mSetForeground, mSetForegroundArgs);  
+            }  
+        }  
+    }  
+  
+}
+
+
+--------------------------------
+
+package com..xdevice.rebottest.utils;
+
+import java.util.List;
+
+import android.app.Service;
+import android.content.Intent;
+import android.os.Binder;
+import android.os.IBinder;
+
+import com..xdevice.rebottest.log.Logger;
+import com..xdevice.rebottest.model.RecordInfo;
+
+public class RunRecordService extends Service {
+
+	public static final String TAG = "RunRecordService";
+	public MyBinder myBinder = new MyBinder();
+
+	@Override
+	public IBinder onBind(Intent intent) {
+		// TODO Auto-generated method stub
+		return myBinder;
+	}
+
+	@Override
+	public void onCreate() {
+		Logger.i(TAG, "RunRecordService onCreate.");
+	}
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+		Logger.i(TAG, "RunRecordService onStartCommand.");
+		// Bundle bundle = intent.getExtras();
+		// ArrayList list = bundle.getParcelableArrayList("records");
+		// List<RecordInfo> records = (List<RecordInfo>) list.get(0);
+
+		new Thread(new Runnable() {
+
+			@Override
+			public void run() {
+				// TODO Auto-generated method stub
+				while (myBinder.getRunFlag()) {
+					// 开始回放
+					RecordManager.runRecords(myBinder.getRecords());
+					myBinder.setRunFlag(false);
+
+				}
+			}
+		}).start();
+		return super.onStartCommand(intent, flags, startId);
+	}
+
+	public class MyBinder extends Binder {
+		private List<RecordInfo> records;
+		private Boolean bRunFlag = false;
+
+		public List<RecordInfo> getRecords() {
+			return records;
+		}
+
+		public void setRecords(List<RecordInfo> records) {
+			this.records = records;
+		}
+
+		public void setRunFlag(Boolean bRunFlag) {
+			this.bRunFlag = bRunFlag;
+		}
+
+		public Boolean getRunFlag() {
+			return this.bRunFlag;
+		}
+
+	}
+}
+
+
+--------------------------------------------
+
+/*
+ *    Copyright 2013 TOYAMA Sumio <jun.nama@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * 
+ * ----
+ * getBytes(), encode() and allocateMore() are modifications based on
+ * work copyrighted and licensed as follows:
+ * 
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com..xdevice.rebottest.utils;
+
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.CodingErrorAction;
+
+import android.annotation.TargetApi;
+import android.os.Build;
+import com.beetstra.jutf7.CharsetProvider;
+
+/**
+ * Utf7ImeHelper provides a simple Modified UTF-7 encoder. <br/>
+ * If you use it in uiautomator, you can write simply as follows:
+ * 
+ * <pre>
+ * ....
+ * 
+ * UiObject editText = ...; 
+ * editText.setText(Utf7ImeHelper.e("こんにちは")); // any Unicode String
+ * 
+ * ....
+ * </pre>
+ * 
+ * @author TOYAMA Sumio
+ * 
+ */
+@TargetApi(Build.VERSION_CODES.GINGERBREAD)
+public class Utf7ImeHelper {
+
+	private static final Charset CHARSET_MODIFIED_UTF7 = new CharsetProvider()
+			.charsetForName("X-MODIFIED-UTF-7");
+
+	/**
+	 * Encodes the specified text into modified UTF-7.
+	 * 
+	 * @param text
+	 *            plain unicode text
+	 * @return encoded text in modified UTF-7.
+	 */
+	public static String e(String text) {
+		byte[] encoded = getBytes(text, CHARSET_MODIFIED_UTF7);
+		return new String(encoded, Charset.forName("US-ASCII"));
+	}
+
+	/**
+	 * Returns a new byte array containing the characters of the specified
+	 * string encoded using the given charset.
+	 * 
+	 * It is equivalent to <code>input.getBytes(charset)</code> except it has
+	 * workaround for the bug ID 61917.
+	 * 
+	 * @see https://code.google.com/p/android/issues/detail?id=61917
+	 */
+	// @formatter:off
+	/*
+	 * The original code is available from
+	 * https://android.googlesource.com/platform
+	 * /libcore/+/android-4.4_r1.2/libdvm/src/main/java/java/lang/String.java
+	 */
+	// @formatter:on
+	public static byte[] getBytes(String input, Charset charset) {
+		CharBuffer chars = CharBuffer.wrap(input.toCharArray());
+		// @formatter:off
+		CharsetEncoder encoder = charset.newEncoder()
+				.onMalformedInput(CodingErrorAction.REPLACE)
+				.onUnmappableCharacter(CodingErrorAction.REPLACE);
+		// @formatter:on
+		ByteBuffer buffer;
+		buffer = encode(chars.asReadOnlyBuffer(), encoder);
+		byte[] bytes = new byte[buffer.limit()];
+		buffer.get(bytes);
+		return bytes;
+
+	}
+
+	// @formatter:off
+	/*
+	 * The original code is available from
+	 * https://android.googlesource.com/platform/libcore/+/android-
+	 * 4.4_r1.2/luni/src/main/java/java/nio/charset/CharsetEncoder.java
+	 */
+	// @formatter:on
+	private static ByteBuffer encode(CharBuffer in, CharsetEncoder encoder) {
+		int length = (int) (in.remaining() * (double) encoder
+				.averageBytesPerChar());
+		ByteBuffer out = ByteBuffer.allocate(length);
+
+		encoder.reset();
+		CoderResult flushResult = null;
+
+		while (flushResult != CoderResult.UNDERFLOW) {
+			CoderResult encodeResult = encoder.encode(in, out, true);
+			if (encodeResult == CoderResult.OVERFLOW) {
+				out = allocateMore(out);
+				continue;
+			}
+
+			flushResult = encoder.flush(out);
+			if (flushResult == CoderResult.OVERFLOW) {
+				out = allocateMore(out);
+			}
+		}
+
+		out.flip();
+		return out;
+	}
+
+	// @formatter:off
+	/*
+	 * The original code is available from
+	 * https://android.googlesource.com/platform
+	 * /libcore/+/master/luni/src/main/java/java/nio/charset/CharsetEncoder.java
+	 */
+	// @formatter:on
+	private static ByteBuffer allocateMore(ByteBuffer output) {
+		if (output.capacity() == 0) {
+			return ByteBuffer.allocate(1);
+		}
+		ByteBuffer result = ByteBuffer.allocate(output.capacity() * 2);
+		output.flip();
+		result.put(output);
+		return result;
+	}
+
+}
+
+
+----------------------------------
+
+package com..xdevice.rebottest.utils;
+
+import java.lang.reflect.Method;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import android.app.ActivityManager;
+import android.app.AppOpsManager;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.pm.PermissionInfo;
+import android.util.Log;
+import android.view.accessibility.AccessibilityNodeInfo;
+
+import com.android.uiautomator.core.UiObject;
+import com.android.uiautomator.core.UiObjectNotFoundException;
+import com.android.uiautomator.core.UiScrollable;
+import com.android.uiautomator.core.UiSelector;
+import com..xdevice.rebottest.log.Logger;
+
+import com..xdevice.rebottest.model.SwipeClickNode;
+
+import com..xdevice.rebottest.runner.UiAutomatorRunner;
+
+
+public class Utils {
+
+	private static final String TAG = "robot_Utils";
+
+	public static String getActivityName() {
+		ActivityManager am = (ActivityManager) MyApplication.getContext()
+				.getSystemService(Context.ACTIVITY_SERVICE);
+		ComponentName cn = am.getRunningTasks(1).get(0).topActivity;
+
+		Logger.i(TAG, "pkg:" + cn.getPackageName());
+		Logger.i(TAG, "cls:" + cn.getClassName());
+
+		return cn.flattenToString();
+	}
+
+	public static void startActivity(String activityName) {
+		Logger.i(TAG, "into startActivity. activityName = " + activityName);
+		Intent startIntent = new Intent(Intent.ACTION_MAIN);
+		startIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+		startIntent.setComponent(new ComponentName(activityName.split("/")[0],
+				activityName.split("/")[1]));
+		startIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+		try {
+			MyApplication.getContext().startActivity(startIntent);
+		} catch (Exception e) {
+			Logger.e(TAG, "startActivity faild! ERROR:" + e.getMessage());
+		}
+
+	}
+    public static void setFocus(AccessibilityNodeInfo node){
+    	Logger.i(TAG, "into setFocus. node info = " + node.toString());
+	    UiObject mUiObject = new UiObject(new UiSelector());
+	    mUiObject.setFocus(node);
+    }
+    public static void click(AccessibilityNodeInfo node){
+    	Logger.i(TAG, "into click. node info = " + node.toString());
+	    UiObject mUiObject = new UiObject(new UiSelector());
+	    mUiObject.clickNode(node);
+    }
+	public static void clickNode(AccessibilityNodeInfo node) {
+		Logger.i(TAG, "into swipe and clickNode. node info = " + node.toString());
+		try {
+			JSONObject params = new JSONObject();
+			JSONObject conditon = new JSONObject();
+			conditon.putOpt("node", node);
+
+			params.putOpt("conditions", conditon);
+
+			params.put("fuzzy", false);
+			params.put("downtime", 100);
+			params.put("isSync", true);
+			params.put("steps", 50);
+			params.put("allowScroll", true);
+			params.put("type", "NORMAL");
+			params.put("maxSwipes", 10);
+			params.put("timeout", 5);
+			params.put("deadzone", 0.1);
+
+			clickWidget(MyApplication.getContext(), params);
+
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+
+	public static boolean grantPermission(String packageName) {
+		Logger.i(TAG, "into grantPermission. Params:" + packageName);
+		PackageManager pm = MyApplication.getContext().getPackageManager();
+		boolean grant = true;
+		try {
+			PackageInfo packageInfo = pm.getPackageInfo(packageName,
+					PackageManager.GET_PERMISSIONS);
+			for (int i = 0; i < packageInfo.requestedPermissions.length; i++) {
+				String requestedPerm = packageInfo.requestedPermissions[i];
+
+				final PermissionInfo permInfo;
+				try {
+					permInfo = pm.getPermissionInfo(requestedPerm, 0);
+				} catch (NameNotFoundException e) {
+					Log.w(TAG, "Unknown permission:" + requestedPerm);
+					continue;
+				}
+				String permName = permInfo.name;
+				final boolean runtime = permInfo.protectionLevel == PermissionInfo.PROTECTION_DANGEROUS;
+				final boolean granted = (packageInfo.requestedPermissionsFlags[i] & PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0;
+				try {
+					if (runtime) {
+						Log.d(TAG, "permission" + permName);
+						if (grant && !granted) {
+							pm.grantRuntimePermission(packageName, permName,
+									android.os.Process.myUserHandle());
+						} else if (!grant && granted) {
+							pm.revokeRuntimePermission(packageName, permName,
+									android.os.Process.myUserHandle());
+						}
+					}
+				} catch (SecurityException e) {
+					//
+					e.printStackTrace();
+				}
+			}
+			return true;
+		} catch (Exception e) {
+			Logger.e(TAG, "grantPermission faild! ERROR: " + e.getMessage());
+			return false;
+		}
+	}
+
+	public static void setMode(int Oprators) {
+
+		Context mContext = MyApplication.getContext();
+		try {
+			String packageName = mContext.getPackageName();
+			Logger.i(TAG, "set mode ; packageName is :" + packageName);
+			PackageManager mPackageManager = mContext.getPackageManager();
+
+			AppOpsManager localAppOpsManager = (AppOpsManager) mContext
+					.getSystemService("appops");
+			PackageInfo packageInfo = mPackageManager.getPackageInfo(
+					packageName, 8192);
+
+			Class apposClass = localAppOpsManager.getClass();
+			Class[] arrayOfClass = new Class[4];
+			arrayOfClass[0] = Integer.TYPE;
+			arrayOfClass[1] = Integer.TYPE;
+			arrayOfClass[2] = String.class;
+			arrayOfClass[3] = Integer.TYPE;
+			Method setMode = apposClass.getDeclaredMethod("setMode",
+					arrayOfClass);
+			setMode.setAccessible(true);
+
+			Object[] arrayOfObject = new Object[4];
+			arrayOfObject[0] = Integer.valueOf(Oprators);// AppOpsManager.OP_WRITE_SMS
+			arrayOfObject[1] = Integer.valueOf(packageInfo.applicationInfo.uid);
+			arrayOfObject[2] = packageName;
+			arrayOfObject[3] = Integer.valueOf(AppOpsManager.MODE_ALLOWED);
+
+			setMode.invoke(localAppOpsManager, arrayOfObject);
+		} catch (Exception e) {
+			Logger.e(TAG, e.getClass().toString() + ":"
+					+ e.getMessage().toString() + ";set mode failed!");
+		}
+	}
+
+	public static String sendText(AccessibilityNodeInfo node, String text) {
+		Logger.i(TAG, "into sendText");
+		try {
+			UiObject mUiObject = new UiObject(new UiSelector());
+			Logger.i(TAG, "Text: " + text);
+			text = Utf7ImeHelper.e(text);
+			Logger.i(TAG, "Utf7ImeHelper Text: " + text);
+			return mUiObject.setText(node, text) + "";
+		} catch (UiObjectNotFoundException e) {
+			return false + "," + e.toString();
+		}
+	}
+
+
+	public static boolean swipe(AccessibilityNodeInfo begin,
+			AccessibilityNodeInfo end, int steps) {
+		Logger.i(TAG, "into swipe. beginNode info = " + begin.toString());
+		Logger.i(TAG, "into swipe. endNode info = " + end.toString());
+		UiObject mUiObject = new UiObject(new UiSelector());
+		return mUiObject.swipe(begin, end, steps);
+	}
+
+	public static boolean clickWidget(Context context, JSONObject params)
+			throws UiObjectNotFoundException {
+		JSONObject conditions = params.optJSONObject("conditions");
+		Logger.i(TAG, "clickWidget params:" + params.toString());
+		int timeout = params.optInt("timeout", 10) * 1000;
+		boolean isSync = params.optBoolean("isSync", false);
+		boolean waitForIdle = params.optBoolean("waitForIdle", true);
+		String type = params.optString("type", "NORMAL");
+		int downtime = params.optInt("downtime", 800);
+		if (downtime <= 800 && type.equalsIgnoreCase("LONG")) {
+			downtime = 2 * 1000;
+		}
+
+		// String location = conditions.optString("location");
+		// if (null != location && !"".equals(location)) {
+		// // 有坐标优先点击坐标
+		// Logger.i(TAG, "use location clickWidget");
+		// location = location.replace("[", "").replace("]", "");
+		// String[] locations = location.split(",");
+		// int x = Integer.valueOf(locations[0]);
+		// int y = Integer.valueOf(locations[1]);
+		// Logger.i(TAG, "x: " + x + ", y: " + y);
+		// return click(x, y, type, downtime);
+		// }
+
+		AccessibilityNodeInfo node = getNodeInfo(params);
+		if (null == node) {
+			Logger.e(TAG, "clickWidget faild! node info is null! ");
+			return false;
+		}
+
+		UiObject object = new UiObject(null);
+		boolean result = object.clickWidget(node, type, downtime, timeout,
+				isSync);
+		Logger.i(TAG, "clickWidget result: " + result);
+		if (waitForIdle) {
+			Logger.i(TAG, "go to waitForIdle!");
+			UiAutomatorRunner.getInstance().getUiDevice().waitForIdle(timeout);
+		}
+
+		return result;
+	}
+
+	private static AccessibilityNodeInfo getNodeInfo(JSONObject params)
+			throws UiObjectNotFoundException {
+		JSONObject conditions = params.optJSONObject("conditions");
+		Logger.i(TAG, "conditions: " + conditions.toString());
+
+		boolean fuzzy = params.optBoolean("fuzzy", false);
+		boolean allowScroll = params.optBoolean("allowScroll", false);
+		int steps = params.optInt("steps", 70);
+		double deadzone = params.optDouble("deadzone", 0.1);
+		int maxSwipes = params.optInt("maxSwipes", 30);
+		int timeout = params.optInt("timeout", 10) * 1000;
+		boolean waitForIdle = conditions.optBoolean("waitForIdle", true);
+		UiSelector selector = getSelector(conditions, waitForIdle, fuzzy);
+		if (conditions.has("after")) {
+			UiSelector after = getSelector(conditions.optJSONObject("after"),
+					waitForIdle, fuzzy);
+			selector.setAfter(after);
+		}
+
+		if (conditions.has("before")) {
+			UiSelector before = getSelector(conditions.optJSONObject("before"),
+					waitForIdle, fuzzy);
+			selector.setBefore(before);
+		}
+
+		// UiAutomatorRunner.getInstance().initialize();
+		AccessibilityNodeInfo node = null;
+		Logger.i(TAG, "clickNode by selector: " + selector.toString());
+		if (allowScroll) {
+			// 新版本滑动查找必须添加.scrollable(true)
+			UiScrollable uiScrollable = new UiScrollable(
+					new UiSelector().scrollable(true));
+			uiScrollable.setSwipeDeadZonePercentage(deadzone);
+			node = uiScrollable.scrollIntoView(selector, maxSwipes, steps,
+					timeout);
+		} else {
+			UiObject object = new UiObject(selector);
+			node = object.findNodeInfo(timeout);
+		}
+
+		return node;
+	}
+
+	private static UiSelector getSelector(JSONObject params,
+			boolean waitForIdle, boolean fuzzy) {
+		Logger.i(TAG, "getSelector params: " + params.toString());
+		UiSelector selector = new UiSelector();
+		selector.setWaitForIdle(waitForIdle);
+		if (params.has("text")) {
+			String text = params.optString("text");
+			selector = fuzzy ? selector.textContains(text) : selector
+					.text(text);
+		}
+
+		if (params.has("startText")) {
+			String startText = params.optString("startText");
+			selector = selector.textStartsWith(startText);
+		}
+
+		if (params.has("id")) {
+			String id = params.optString("id");
+			selector = selector.resourceIdMatches(".+" + id);
+		}
+
+		if (params.has("desc")) {
+			String desc = params.optString("desc");
+			selector = fuzzy ? selector.descriptionContains(desc) : selector
+					.description(desc);
+		}
+
+		if (params.has("className")) {
+			String className = params.optString("className");
+			selector = selector.className(className);
+		}
+
+		if (params.has("name")) {
+			String className = params.optString("name");
+			selector = selector.className(className);
+		}
+
+		if (params.has("instance")) {
+			int instance = params.optInt("instance", 0);
+			selector = selector.index(instance);
+		}
+
+		if (params.has("index")) {
+			int instance = params.optInt("index", 0);
+			selector = selector.index(instance);
+		}
+
+		if (params.has("window")) {
+			String window = params.optString("window");
+			selector.setWindow(window);
+		}
+
+		if (params.has("node")) {
+
+			AccessibilityNodeInfo node = (AccessibilityNodeInfo) (params
+					.opt("node"));
+			Logger.i(TAG, "node info: " + node.toString());
+			selector = selector.selector_node(node);
+		}
+
+		return selector;
+	}
+}
+
+
